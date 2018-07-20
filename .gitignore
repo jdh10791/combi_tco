@@ -1,7 +1,14 @@
-/obsolete
-
 /.ipynb_checkpoints
+*.xlsx
 
-/plots
-/output
-/input
+/XRD_analysis/obsolete
+/XRD_analysis/.ipynb_checkpoints
+/XRD_analysis/plots
+/XRD_analysis/output
+/XRD_analysis/input
+
+/EIS_analysis/.ipynb_checkpoints
+/EIS_analysis/__pycache__
+
+
+
