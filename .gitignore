@@ -1,14 +1,18 @@
 /.ipynb_checkpoints
 *.xlsx
 
-/XRD_analysis/obsolete
-/XRD_analysis/.ipynb_checkpoints
-/XRD_analysis/plots
-/XRD_analysis/output
-/XRD_analysis/input
+/xrd/obsolete
+/xrd/.ipynb_checkpoints
+/xrd/plots
+/xrd/output
+/xrd/input
 
-/EIS_analysis/.ipynb_checkpoints
-/EIS_analysis/__pycache__
+/eis/.ipynb_checkpoints
+/eis/__pycache__
+
+/conductivity/.ipynb_checkpoints
+/helpers/__pycache__
+/stats/.ipynb_checkpoints
 
 
 
