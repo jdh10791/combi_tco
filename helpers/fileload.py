@@ -94,7 +94,7 @@ def concat_nameswvalues(df,cols=None,roundvals=False):
 	tdf['concat'] = tdf.apply(lambda x: ''.join(x),axis=1)
 	return tdf['concat']
 
-def get_formula(df,overwrite=False):
+def get_formula(df,overwrite=False,round=5):
 	'''
 	derive chemical formula from X_at columns of dataframe
 	----------------
@@ -129,7 +129,7 @@ def get_formula(df,overwrite=False):
 	normcomp = comp.divide(sites['sitemax'],axis=0)
 
 	#concatenate elements & fractions to get formula string
-	normcomp['formula'] = concat_nameswvalues(normcomp,roundvals=5)
+	normcomp['formula'] = concat_nameswvalues(normcomp,roundvals=round)
 	normcomp['formula'] = normcomp['formula'] + 'O3'
 	
 	if overwrite==False:

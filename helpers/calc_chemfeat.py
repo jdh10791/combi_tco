@@ -6,7 +6,7 @@ from pymatgen.ext.matproj import MPRester
 import os
 import warnings
 import itertools
-
+from pypif.obj import ChemicalSystem, Property
 
 class matproj_calc:
 	def __init__(self,oxide_dict={}):
@@ -321,7 +321,7 @@ class perovskite:
 			#get closest CN to CN for site
 			cn = self.site_cn[self.cation_site[f]]
 			rom = self._closest_CN(f,ox,cn)
-			#print(f,ox,rom)
+			print('fixed:',f,ox,rom)
 			#should only be one spin state
 			fixed_dict[f] = {'r':el.data['Shannon radii']['{}'.format(ox)][rom]['']['ionic_radius'],
 							 'n':ox}
@@ -336,9 +336,9 @@ class perovskite:
 			for ox in self.allowed_ox_states[m]:
 				el = mg.Element(m)
 				#get closest CN to CN for site
-				cn = self.site_cn[self.cation_site[f]]
+				cn = self.site_cn[self.cation_site[m]]
 				rom = self._closest_CN(m,ox,cn)
-				#print(m,ox,rom)
+				print('multi:',m,ox,rom)
 				try: #assume transition metal assumes high-spin state if available (assumption made by Bartel)
 					md[ox] = {'r':el.data['Shannon radii']['{}'.format(ox)][rom]['High Spin']['ionic_radius'],
 								 'n':ox}
@@ -544,4 +544,30 @@ class perovskite:
 		self.features['A:B_ratio'] = self.A_sum/self.B_sum
 		
 		return self.features
+		
+def formula_redfeat(formula,cat_ox_lims={}):
+    pvskt = perovskite(formula,site_ox_lim={'A':[2,4],'B':[2,4]},site_base_ox={'A':2,'B':4})
+    for k,v in cat_ox_lims.items():
+        pvskt.set_cat_ox_lim(k,v)
+    pvskt.featurize()
+    red_feat = {'{}'.format(k):v for (k,v) in pvskt.features.items() 
+                if k[-5:] not in ['oxmin','oxmax'] and k[0:7]!='O_delta'}
+    return red_feat
+	
+def formula_pif(formula,cat_ox_lims={},red_feat=None):
+    '''
+    create pif with formula and chemical feature properties
+    '''
+    fpif = ChemicalSystem()
+    fpif.chemical_formula = formula
+    if red_feat is None:
+        red_feat = formula_readfeat(formula,cat_ox_lims)
+    
+    props = []
+    for feat, val in red_feat.items():
+        prop = Property(name=feat,scalars=val)
+        props.append(prop)
+    fpif.properties=props
+    
+    return fpif, red_feat
 
