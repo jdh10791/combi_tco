@@ -10,7 +10,7 @@ from ternary.helpers import simplex_iterator
 
 def quat_slice_scatter(data, z, slice_start, slice_width=0, slice_axis='Y', tern_axes=['Co','Fe','Zr'], tern_labels=None, labelsize=14,
 					tick_kwargs={'axis':'lbr', 'linewidth':1, 'tick_formats':'%.1f','offset':0.03}, nticks=5, add_labeloffset=0,
-					cmap=plt.cm.viridis, ax=None,vmin=None,vmax=None,ptsize=8, figsize=None):
+					cmap=plt.cm.viridis, ax=None,vmin=None,vmax=None,ptsize=8, figsize=None, scatter_kw={}):
 	if slice_width==0:
 		df = data[data[slice_axis] == slice_start]
 	else:
@@ -36,9 +36,11 @@ def quat_slice_scatter(data, z, slice_start, slice_width=0, slice_axis='Y', tern
 		tfig, tax = ternary.figure(scale=scale,ax=ax)
 	else:
 		tax = ternary.TernaryAxesSubplot(scale=scale,ax=ax)
-
-	tax.scatter(scaled_pts,s=ptsize,cmap=cmap, vmin=vmin,vmax=vmax,
-				colorbar=False,c=colors)
+	
+	if len(points) > 0:
+		tax.scatter(scaled_pts,s=ptsize,cmap=cmap, vmin=vmin,vmax=vmax,
+				colorbar=False,c=colors,**scatter_kw)
+				
 	tax.boundary(linewidth=1.0)
 	tax.clear_matplotlib_ticks()
 	
