@@ -1,0 +1,10 @@
+Processing library PDAC_COM3_01119
+Ignored variables:
+	Points
+	Ratio_111_110
+	Ratio_200_110
+*Warning: missing standard variables:
+	Ratio_111_100
+	Ratio_200_100
+Wrote PDAC_COM3_01119_AllVar.csv
+Finished processing library PDAC_COM3_01119

@@ -1,0 +1,38 @@
+Processing library PDAC_COM3_01099
+Ignored variables:
+	110_s_Area
+	110_s_FWHM
+	110_s_MaxIntensity
+	110_s_Position
+	110_s_Sigma
+	CoFe_at
+	Frac_
+	Frac_111
+	Frac_200
+	Frac_ITO_Peak1
+	Frac_ITO_Peak2
+	FWHM_ITO_Peak1
+	FWHM_ITO_Peak2
+	MaxInt_ITO_Peak1
+	MaxInt_ITO_Peak2
+	Norm_d
+	Norm_Int110
+	Points
+	Pos_ITO_Peak1
+	Pos_ITO_Peak2
+	Ratio_111_110
+	taken
+	ZrY_at
+	_s_Area
+	_s_FWHM
+	_s_MaxIntensity
+	_s_Position
+	_s_Sigma
+*Warning: missing standard variables:
+	FWHM_200
+	MaxInt_200
+	Pos_200
+	Ratio_111_100
+	Ratio_200_100
+Wrote PDAC_COM3_01099_AllVar.csv
+Finished processing library PDAC_COM3_01099

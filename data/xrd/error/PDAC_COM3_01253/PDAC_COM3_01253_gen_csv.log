@@ -1,0 +1,36 @@
+Processing library PDAC_COM3_01253
+Ignored variables:
+	110_s_FWHM
+	110_s_MaxIntensity
+	110_s_Sigma
+	CoFe_at
+	Frac_
+	Frac_110
+	Frac_111
+	Frac_200
+	Frac_ITO_Peak1
+	Frac_ITO_Peak2
+	FWHM_ITO_Peak1
+	FWHM_ITO_Peak2
+	MaxInt_ITO_Peak1
+	MaxInt_ITO_Peak2
+	Norm_Int110
+	Points
+	Pos_ITO_Peak1
+	Pos_ITO_Peak2
+	taken
+	ZrY_at
+*Warning: missing standard variables:
+	x_mm
+	y_mm
+	d_um
+	Ratio_111_100
+	Ratio_200_100
+	PeakArea_110
+*Warning: missing composition variables:
+	Co_at
+	Fe_at
+	Y_at
+	Zr_at
+Wrote PDAC_COM3_01253_AllVar.csv
+Error(s) detected, moving to C:\Users\jdhuang\OneDrive - Colorado School of Mines/Research/MIDDMI/TCO/Data\error

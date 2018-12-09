@@ -1,0 +1,12 @@
+Processing library PDAC_COM3_01505
+Ignored variables:
+	Ba_at
+	Frac_110
+	Frac_111
+	Frac_200
+*Warning: missing standard variables:
+	Ratio_111_100
+	Ratio_200_100
+	PeakArea_110
+Wrote PDAC_COM3_01505_AllVar.csv
+Finished processing library PDAC_COM3_01505

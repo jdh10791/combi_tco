@@ -1,0 +1,15 @@
+Processing library PDAC_COM3_01503
+Ignored variables:
+	Ba_at
+	Frac_110
+*Warning: missing standard variables:
+	FWHM_111
+	FWHM_200
+	MaxInt_111
+	MaxInt_200
+	Pos_111
+	Pos_200
+	Ratio_111_100
+	Ratio_200_100
+Wrote PDAC_COM3_01503_AllVar.csv
+Finished processing library PDAC_COM3_01503
