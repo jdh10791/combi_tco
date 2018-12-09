@@ -1,19 +1,20 @@
-/.ipynb_checkpoints
-*.xlsx
+*.pptx
 *.png
 
-/xrd/obsolete
-/xrd/.ipynb_checkpoints
-/xrd/plots
-/xrd/output
-/xrd/input
+/scripts/.ipynb_checkpoints
 
-/eis/.ipynb_checkpoints
-/eis/__pycache__
+/scripts/xrd/obsolete
+/scripts/xrd/.ipynb_checkpoints
+/scripts/xrd/plots
+/scripts/xrd/output
+/scripts/xrd/input
 
-/conductivity/.ipynb_checkpoints
-/helpers/__pycache__
-/stats_test/.ipynb_checkpoints
+/scripts/eis/.ipynb_checkpoints
+/scripts/eis/__pycache__
+
+/scripts/conductivity/.ipynb_checkpoints
+/scripts/helpers/__pycache__
+/scripts/stats_test/.ipynb_checkpoints
 
 
 
