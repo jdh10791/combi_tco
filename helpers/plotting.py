@@ -62,10 +62,64 @@ def quat_slice_scatter(data, z, slice_start, slice_width=0, slice_axis='Y', tern
 	ax.axis('off')
 	  
 	return tax, vmin, vmax
+	
+def scatter_slices(data, z, slice_axis, slice_starts, slice_widths, tern_axes, axes=None, ncols=2, figsize=None, colorbar=True,cmap = plt.cm.viridis,
+				vmin=None, vmax=None, titles=True, titlesize=14, titlebox_props=dict(boxstyle='round', facecolor='wheat', alpha=0.5),**slice_scatter_kw):
+	
+	if axes is None:
+		nrows = int(np.ceil(len(slice_starts)/ncols))
+		if figsize==None:
+			figsize = [ncols*6.5,nrows*4.8]
+		fig, axes = plt.subplots(nrows,ncols,figsize=figsize)
+	else:
+		nrows = axes.shape[0]
+	
+	#if single value given for slice_widths, make list of len matching slice_starts
+	if type(slice_widths)!=list:
+		slice_widths = [slice_widths]*len(slice_starts)
+	
+	#get vmin and vmax
+	if vmin is None or vmax is None:
+		vmins = []
+		vmaxs = []
+		
+		for slice_start,slice_width in zip(slice_starts,slice_widths):
+			if slice_width==0:
+				df = data[data[slice_axis] == slice_start]
+			else:
+				df = data[(data[slice_axis] >= slice_start) & (data[slice_axis] < slice_start +	 slice_width)]
+
+			vmins.append(df.loc[:,z].min())
+			vmaxs.append(df.loc[:,z].max())
+		
+		if vmin is None:
+			vmin = min(vmins)
+		if vmax is None:
+			vmax = max(vmaxs)
+	
+	for i, (slice_start,slice_width) in enumerate(zip(slice_starts,slice_widths)):
+		try: #2d axes
+			ax = axes[int(i/ncols), i%ncols]
+		except IndexError: #1d axes
+			ax = axes[i]
+		tax, vmin, vmax = quat_slice_scatter(data, z, slice_start, slice_width=slice_width, slice_axis=slice_axis, tern_axes=tern_axes, ax=ax, 
+										cmap=cmap,vmin=vmin, vmax=vmax,**slice_scatter_kw)
+
+		if titles==True:
+			ax.set_title('{:.2g} < {} < {:.2g}'.format(slice_start,slice_axis,slice_start+slice_width),
+					  size=titlesize,x=0.1,bbox=titlebox_props)
+	
+	if colorbar==True:
+		add_colorbar(vmin=vmin,vmax=vmax,label=z,labelkwargs={'size':16,'labelpad':10},
+				tickparams={'labelsize':12}, tickformat='%.1f',ax=axes, cmap=cmap,
+				subplots_adjust={'left':0.05,'wspace':0.35, 'hspace':0.25, 'right':0.8})
+	
+	return axes
 
 def add_colorbar(fig=None, ax=None, cbrect=[0.9,0.15,0.02,0.75], label=None, tickformat=None, 
-				 cmap = plt.cm.viridis, vmin=None, vmax=None, logscale=False,
-				 tickparams={}, labelkwargs={},subplots_adjust={'left':0.05,'wspace':0.35, 'hspace':0.25, 'right':0.8}):
+				 cmap = plt.cm.viridis, vmin=None, vmax=None, logscale=False, norm=None,
+				 tickparams={}, labelkwargs={},subplots_adjust={'left':0.05,'wspace':0.35, 'hspace':0.25, 'right':0.8},
+				 **cb_kwargs):
 	#add a single colorbar
 	if fig is None:
 		fig = plt.gcf()
@@ -74,13 +128,15 @@ def add_colorbar(fig=None, ax=None, cbrect=[0.9,0.15,0.02,0.75], label=None, tic
 	#make an axis for colorbar to control position/size
 	cbaxes = fig.add_axes(cbrect) #[left, bottom, width, height]
 	#code from colormapping.colorbar_hack
-	if logscale==True:
-		norm = colors.LogNorm(vmin=vmin,vmax=vmax)
-	else:
-		norm = plt.Normalize(vmin=vmin,vmax=vmax)
+	
+	if norm==None:
+		if logscale==True:
+			norm = colors.LogNorm(vmin=vmin,vmax=vmax)
+		else:
+			norm = plt.Normalize(vmin=vmin,vmax=vmax)
 	sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 	sm._A = []
-	cb = fig.colorbar(sm, ax=ax, cax=cbaxes, format=tickformat)
+	cb = fig.colorbar(sm, ax=ax, cax=cbaxes, format=tickformat,**cb_kwargs)
 	cb.ax.tick_params(**tickparams)
 	if label is not None:
 		cb.set_label(label, **labelkwargs)
