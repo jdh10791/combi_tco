@@ -1,20 +1,17 @@
 *.pptx
 *.png
-
-/scripts/.ipynb_checkpoints
+.ipynb_checkpoints/
+__pycache__/
+*.DS_Store
+plots/
+References/
+slides/
 
 /scripts/xrd/obsolete
-/scripts/xrd/.ipynb_checkpoints
-/scripts/xrd/plots
 /scripts/xrd/output
 /scripts/xrd/input
 
-/scripts/eis/.ipynb_checkpoints
-/scripts/eis/__pycache__
 
-/scripts/conductivity/.ipynb_checkpoints
-/scripts/helpers/__pycache__
-/scripts/stats_test/.ipynb_checkpoints
 
 
 
