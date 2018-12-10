@@ -2,9 +2,9 @@
 This is a project focused on analysis of triple conducting oxides (TCOs). TCOs are combinatorially synthesized via pulsed laser deposition (PLD) and characterized using high-throughput methods. 
 
 data: raw data from Meagan Papac, collected at NREL
-    conductivity: DC conductivity data
-  eis: impedance data (ASR)
-  xrd: XRD data
+* conductivity: DC conductivity data
+* eis: impedance data (ASR)
+* xrd: XRD data
 
 scripts: python scripts for processing and analysis
   conductivity: notebooks for DC conductivity analysis
