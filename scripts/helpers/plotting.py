@@ -63,8 +63,9 @@ def quat_slice_scatter(data, z, slice_start, slice_width=0, slice_axis='Y', tern
 	  
 	return tax, vmin, vmax
 	
-def scatter_slices(data, z, slice_axis, slice_starts, slice_widths, tern_axes, axes=None, ncols=2, figsize=None, colorbar=True,cmap = plt.cm.viridis,
-				vmin=None, vmax=None, titles=True, titlesize=14, titlebox_props=dict(boxstyle='round', facecolor='wheat', alpha=0.5),**slice_scatter_kw):
+def scatter_slices(data, z, slice_axis, slice_starts, slice_widths, tern_axes, axes=None, ncols=2, figsize=None, colorbar=True,
+				cmap = plt.cm.viridis, cb_kwargs = {}, vmin=None, vmax=None,
+				 titles=True, titlesize=14, titlebox_props=dict(boxstyle='round', facecolor='wheat', alpha=0.5),**slice_scatter_kw):
 	
 	if axes is None:
 		nrows = int(np.ceil(len(slice_starts)/ncols))
@@ -110,9 +111,11 @@ def scatter_slices(data, z, slice_axis, slice_starts, slice_widths, tern_axes, a
 					  size=titlesize,x=0.1,bbox=titlebox_props)
 	
 	if colorbar==True:
-		add_colorbar(vmin=vmin,vmax=vmax,label=z,labelkwargs={'size':16,'labelpad':10},
-				tickparams={'labelsize':12}, tickformat='%.1f',ax=axes, cmap=cmap,
+		cb_defaults = dict(label=z,labelkwargs={'size':16,'labelpad':10},
+				tickparams={'labelsize':12}, tickformat='%.1f',
 				subplots_adjust={'left':0.05,'wspace':0.35, 'hspace':0.25, 'right':0.8})
+		cb_defaults.update(cb_kwargs)
+		add_colorbar(vmin=vmin,vmax=vmax,ax=axes, cmap=cmap,**cb_defaults)
 	
 	return axes
 
@@ -127,7 +130,7 @@ def add_colorbar(fig=None, ax=None, cbrect=[0.9,0.15,0.02,0.75], label=None, tic
 		ax = plt.gca()
 	#make an axis for colorbar to control position/size
 	cbaxes = fig.add_axes(cbrect) #[left, bottom, width, height]
-	#code from colormapping.colorbar_hack
+	#code from ternary.colormapping.colorbar_hack
 	
 	if norm==None:
 		if logscale==True:
