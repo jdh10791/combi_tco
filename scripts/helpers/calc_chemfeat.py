@@ -22,6 +22,7 @@ class matproj_calc:
 		self.mp = MPRester(os.environ['MATPROJ_API_KEY'])
 		
 	def get_fH(self,formula, phase='solid'): #get exp formation enthalpy
+		"Get average experimental formation enthalpy for formula and phase"
 		#first check for corrected data in fH_corrections
 		try:
 			fH = self.fH_corrections[(formula,phase)]
@@ -44,6 +45,7 @@ class matproj_calc:
 		return np.mean(fH)
 
 	def oxide_formula(self,metal,ox_state,return_mn=False):
+		"Get metal oxide formula with integer units"
 		#formula MmOn
 		OM_ratio = ox_state/2
 		if OM_ratio%1 == 0.5:
@@ -58,6 +60,7 @@ class matproj_calc:
 			return formula, m, n
 
 	def oxide_obe(self,formula): #M-O bond energy per mol of oxide
+		"Get molar metal-oxygen bond energy (OBE) for simple metal oxide"
 		try:
 			obe = self.calc_obe[formula]
 		except KeyError:
@@ -76,6 +79,17 @@ class matproj_calc:
 		return obe
 
 	def get_ABE(self,formula,A_site,B_site,verbose=False):
+		"""
+		Estimate average metal-oxygen bond energy for complex perovskite oxide from simple oxide thermo data
+		Formula from Sammells et al. (1992), Solid State Ionics 52, 111-123.
+		
+		Parameters:
+		-----------
+		formula: oxide formula
+		A_site: list of A-site elements
+		B_site: list of B-site elements
+		verbose: if True, print info about which simple oxides used in calculation
+		"""
 		#validated on compounds in Sammells 1992 - all but CaTi0.7Al0.3O3 agree
 		#validated on (La,Sr)(Cr,Co,Fe)O3 compounds in https://pubs.acs.org/doi/suppl/10.1021/acs.jpcc.6b10571/suppl_file/jp6b10571_si_001.pdf
 			#works if Co3O4 specified in oxide_dict
@@ -120,10 +134,14 @@ class matproj_calc:
 			#print(abe)
 
 		return abe
+		
 
 
 
-def bond_IC(a,b): #ionic character of bond based on Pauling electronegativities
+def bond_IC(a,b): 
+	"""
+	ionic character of bond between elemenets a and b based on Pauling electronegativities
+	"""
 	a_ = mg.Element(a)
 	b_ = mg.Element(b)
 	return 1-np.exp(-0.25*(a_.X-b_.X)**2)
