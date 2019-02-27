@@ -120,6 +120,7 @@ class DataCleaner():
 		----------
 		z_thresh: z-score threshold for intra-cluster outlier identification
 		"""
+		self.z_thresh = z_thresh
 		self.pred = pd.DataFrame()
 		self.pred[self.prop_dim] = self.data[self.prop_dim]
 		self.pred.loc[:,'cluster'] = self.db.fit_predict(self.scaled_comp_data) #db has no pure predict function
@@ -179,6 +180,7 @@ class DataCleaner():
 		
 		Parameters
 		----------
+		
 		slice_axis: composition dimension on which to slice
 		slice_starts: values of slice_axis at which to start slices
 		slice_widths: widths of slices in slice_axis dimension. Single value or list
@@ -186,11 +188,15 @@ class DataCleaner():
 		cmap: colormap for prop_dim values
 		scatter_kwargs: kwargs to pass to helpers.plotting.scatter_slices
 		"""
+		#get vmin and vmax
+		vmin = self.data[self.prop_dim].min()
+		vmax = self.data[self.prop_dim].max()
 		#plot inliers
-		axes = scatter_slices(self.inliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,**scatter_kwargs)
+		axes = scatter_slices(self.inliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,
+							vmin=vmin,vmax=vmax,**scatter_kwargs)
 		#plot outliers
 		scatter_slices(self.outliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,axes=axes,
-					   ptsize=20,scatter_kw=dict(marker='d',edgecolors='r',linewidths=0.8),**scatter_kwargs)
+					   vmin=vmin,vmax=vmax, colorbar=False, ptsize=20,scatter_kw=dict(marker='d',edgecolors='r',linewidths=0.8),**scatter_kwargs)
 		
 	def plot_clusters(self, slice_axis, slice_starts, slice_widths, tern_axes, cmap=plt.cm.jet,**scatter_kwargs):
 		"""
@@ -220,7 +226,8 @@ class DataCleaner():
 		cmap: colormap for prop_dim values
 		scatter_kwargs: kwargs to pass to helpers.plotting.scatter_slices
 		"""
-		scatter_slices(self.outliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,**scatter_kwargs)
+		axes = scatter_slices(self.outliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,**scatter_kwargs)
+		return axes
 		
 	def plot_inliers(self, slice_axis, slice_starts, slice_widths, tern_axes, cmap=plt.cm.viridis,**scatter_kwargs):
 		"""
@@ -235,7 +242,8 @@ class DataCleaner():
 		cmap: colormap for prop_dim values
 		scatter_kwargs: kwargs to pass to helpers.plotting.scatter_slices
 		"""
-		scatter_slices(self.inliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,**scatter_kwargs)
+		axes = scatter_slices(self.inliers,self.prop_dim,slice_axis,slice_starts,slice_widths,tern_axes,cmap=cmap,**scatter_kwargs)
+		return axes
 	
 	def cluster_hist(self,ncols=2):
 		
@@ -262,6 +270,10 @@ class DataCleaner():
 			ax.set_xlabel('Cluster Z-score')
 			ax.set_ylabel('Frequency')
 			ax.legend()
+			
+			#plot z-score threshold
+			ax.axvline(-self.z_thresh,ls='--',c='r')
+			ax.axvline(self.z_thresh,ls='--',c='r')
 		fig.tight_layout()
 		
 	def quat_plot(self,ax=None,quat_axes=['Co','Fe','Zr','Y'], gridlines=True, cb_label=None, s=3,**scatter_kw):
