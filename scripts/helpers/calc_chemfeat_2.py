@@ -1,8 +1,14 @@
 #1/21/19: created v2 to add new chem features
-# replaced Shannon ionic radius with Shannon crystal radius -  should correspond more closely to actual size in crystalline solid
+# Allow choice of Shannon ionic radius or Shannon crystal radius - crystal should correspond more closely to actual size in crystalline solid, but ionic more widely used
 # Generalized to non-oxide perovskites
 # Created separate site compositions and site features in Perovskite class
-# 
+# Calculate MX_ABE for each oxidation state combination
+# New features:
+# 	TM fraction and multivalent fraction
+# 	Cation ionization energy (oxidation-state-dependent)
+# 	Acceptor, donor, and net aliovalent doping magnitude
+# 	Goldschmidt predicted structure (oxidation-state-dependent)
+# 	Estimated perovskite formation enthalpy (oxidation-state-dependent)
 
 
 import numpy as np
