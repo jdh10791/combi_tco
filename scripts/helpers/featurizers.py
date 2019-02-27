@@ -69,7 +69,8 @@ class AtomicOrbitalsMod(BaseFeaturizer):
 				#if LUMO is None
 				feat['{}_character'.format(edge)] = 'na'
 				feat['{}_element'.format(edge)] = 'na'
-				feat['{}_energy'.format(edge)] = 0 #unclear what this value should be. Arbitrarily set to 0. Don't want NaN for modeling
+				#unclear what this value should be. Arbitrarily set to 0. Don't want NaN for modeling
+				feat['{}_energy'.format(edge)] = 0 
 				
 		feat['gap_AO'] = feat['LUMO_energy'] - feat['HOMO_energy']
 
@@ -323,10 +324,6 @@ class PerovskiteProperty(BaseFeaturizer):
 			raise Exception('CohesiveEnergy features or labels have changed')
 											 
 		self.ElementProperty_label_check()
-		
-	# def matminer_featurizer_labels(self):
-		# #verify that matminer feature labels haven't changed
-		# if self.ValenceOrbital.feature_labels()[0:3]=
 		
 	
 	

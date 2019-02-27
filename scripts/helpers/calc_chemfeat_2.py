@@ -12,11 +12,8 @@ from pymatgen.ext.matproj import MPRester
 import os
 import warnings
 import itertools
-from pypif.obj import ChemicalSystem, Property
 from math import gcd
 import mendeleev as mdl
-
-
 
 print('loaded calc_chemfeat_2')
 
