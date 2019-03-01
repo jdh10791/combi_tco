@@ -1,5 +1,4 @@
-# import os
-# os.chdir(os.path.join(os.environ['HOME'],"OneDrive - Colorado School of Mines/Research/MIDDMI/TCO/scripts"))
+# Convenience functions for ternary plotting
 
 import numpy as np
 import pandas as pd

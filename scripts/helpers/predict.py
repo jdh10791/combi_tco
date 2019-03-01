@@ -1,3 +1,5 @@
+# Functions for predicting using Citrination API
+
 import pypif.pif
 from citrination_client import CitrinationClient
 import pandas as pd

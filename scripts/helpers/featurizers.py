@@ -1,3 +1,5 @@
+# Module for matminer-style featurizers
+
 import numpy as np
 import pandas as pd
 import pymatgen as mg

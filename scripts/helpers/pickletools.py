@@ -1,3 +1,5 @@
+# Tools for working with pickles
+
 import pickle
 
 def save_pickle(obj, file):
