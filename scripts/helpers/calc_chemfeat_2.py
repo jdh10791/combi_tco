@@ -263,21 +263,9 @@ class MatProjCalc:
 		
 		fH = H_sub + obe + 1.5*self.dissocation_energy['O']
 		return fH
-				
-		
 
-
-
-# def bond_IC(a,b): 
-	# """
-	# ionic character of bond between elements a and b based on Pauling electronegativities
-	# """
-	# a_ = mg.Element(a)
-	# b_ = mg.Element(b)
-	# return 1-np.exp(-0.25*(a_.X-b_.X)**2)
-
+#create MatProjCalc instance to store fetched data/calculations
 mpcalc = MatProjCalc()
-	
 	
 class Perovskite:
 	"""
@@ -405,21 +393,6 @@ class Perovskite:
 						  Oxidation state limits for each ion 
 						  (doesn\'t reflect physically allowed oxidation states,
 						  just user-defined limits on the range of physical oxidation states that will be considered)''')
-	
-	
-	# @property
-	# def composition(self):
-		# '''
-		# pymatgen.Composition object
-		# '''
-		# return mg.Composition(self.formula)
-	
-	# @property
-	# def el_amts(self):
-		# '''
-		# dict of formula units for each element
-		# '''
-		# return self.composition.get_el_amt_dict()
 	
 	@property
 	def cations(self):
@@ -1237,8 +1210,6 @@ class Perovskite:
 			
 		return feature_labels
 	
-	
-	
 def formula_redfeat(formula,cat_ox_lims={}):
 	pvskt = perovskite(formula,site_ox_lim={'A':[2,4],'B':[2,4]},site_base_ox={'A':2,'B':4})
 	for k,v in cat_ox_lims.items():
@@ -1264,15 +1235,5 @@ def formula_pif(formula,cat_ox_lims={},red_feat=None):
 	fpif.properties=props
 	
 	return fpif, red_feat
-
-# class MatminerFeaturizer():
-	# def __init__(self,featurizers):
-		# self.featurizers = featurizers
-		
-		
-	# def featurize_dataframe(df,col_id,inplace=False):
-		# fdf = StrToComposition().featurize(df,col_id='formula',inplace=inplace)
-		# for featurizer in self.featurizers:
-			# fdf = 
 			
 	
