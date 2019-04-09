@@ -53,6 +53,7 @@ def get_linked_groups(corrcoeff, thresh):
     
     return groups
 	
+	
 def choose_independent_features(corrcoeff,thresh,response_col=0,drop_invariant=True):
     """
     Choose features that correlate best with the response and are not correlated with each other.
@@ -84,13 +85,13 @@ def choose_independent_features(corrcoeff,thresh,response_col=0,drop_invariant=T
         raise Exception('Number of correlated and independent features do not match total number')
     
     if drop_invariant==True:
-        invariant = list(np.where(np.nan_to_num(fcorr,0)[0]==0)[0])
+        invariant = list(np.where(np.nan_to_num(corrcoeff,0)[0]==0)[0])
         keep = list(set(keep) - set(invariant))
     
     #always keep the response
     if response_col not in keep:
         keep.append(response_col)
     
-    keep.sort()
+    #keep.sort()
     
     return keep
