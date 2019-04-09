@@ -85,7 +85,7 @@ class MatProjCalc:
 		
 		return [f'{metal}{m}{anion}{n}' for m,n in self.mn_combos if m/n <= -anion_ox_state and metal_ox_lim[0] <= -anion_ox_state*n/m <= metal_ox_lim[1]]
 		
-	def get_fH(self,formula, phase='solid', silent=True):
+	def get_fH(self,formula, phase='solid', data_type='exp',silent=True):
 		"""
 		Get average experimental formation enthalpy for formula and phase
 		
@@ -96,27 +96,50 @@ class MatProjCalc:
 		"""
 		#first check for corrected/saved data in fH_dict
 		try:
-			fH = self.fH_dict[(formula,phase)]
+			fH,msg = self.fH_dict[(formula,phase,data_type)]
+			if silent==False:
+				print(msg)
 		#if no entry exists, look up in MP
 		except KeyError:
-			results = self.mp.get_exp_thermo_data(formula)
-			if phase=='solid':
-				phase_results = [r for r in results if r.type=='fH' and r.phaseinfo not in ('liquid','gas')]
-			else:
-				phase_results = [r for r in results if r.type=='fH' and r.phaseinfo==phase]
-			phases = np.unique([r.phaseinfo for r in phase_results])
-			fH = [r.value for r in phase_results]
+			results = self.mp.get_data(formula,data_type=data_type)
+			if data_type=='exp':
+				#results = self.mp.get_exp_thermo_data(formula)
+				if phase=='solid':
+					phase_results = [r for r in results if r.type=='fH' and r.phaseinfo not in ('liquid','gas')]
+				else:
+					phase_results = [r for r in results if r.type=='fH' and r.phaseinfo==phase]
+				phases = np.unique([r.phaseinfo for r in phase_results])
+				fH = [r.value for r in phase_results]
+				
+			elif data_type=='vasp':
+				if phase in ('liquid','gas'):
+					raise ValueError('VASP data only valid for solid phases')
+				elif phase=='solid':
+					#get entry with lowest energy above hull
+					srt_results = sorted(results,key=lambda x: x['e_above_hull'])
+					phase_results = srt_results[0:1]
+				else:
+					phase_results = [r for r in results if r['spacegroup']['crystal_system']==phase]
+				phases = np.unique([r['spacegroup']['crystal_system'] for r in phase_results])
+				n_atoms = mg.Composition(formula).num_atoms
+				#DFT formation energies given in eV per atom - need to convert to kJ/mol
+				fH = [r['formation_energy_per_atom']*n_atoms*96.485 for r in phase_results]
+				
 			if len(fH)==0:
-				raise LookupError('No thermo data for {} in {} phase'.format(formula,phase))
+				raise LookupError('No {} data for {} in {} phase'.format(data_type,formula,phase))
 			maxdiff = np.max(fH) - np.min(fH)
 			if maxdiff > 15:
 				warnings.warn('Max discrepancy of {} in formation enthalpies for {} exceeds limit'.format(maxdiff,formula))
+			fH = np.mean(fH)
+			
+			msg = 'Formation enthalpy for {} in {} phase includes {} data from phases: {}'.format(formula,phase,data_type,', '.join(phases))
 			if silent==False:
-				print('Formation enthalpy for {} in {} phase includes data from phases: {}'.format(formula,phase,', '.join(phases)))
-			#print('Max difference: {}'.format(maxdiff))
-		fH_mean = np.mean(fH)
-		self.fH_dict[(formula,phase)] = fH_mean
-		return fH_mean
+				print(msg)
+			
+			#store value and info message for future lookup
+			self.fH_dict[(formula,phase,data_type)] = (fH,msg)
+			
+		return fH
 
 	def ionic_formula_from_ox_state(self,metal,anion,metal_ox_state,anion_ox_state=None,return_mn=False):
 		"""
@@ -184,7 +207,7 @@ class MatProjCalc:
 		else:
 			return oxide, m, n
 
-	def MX_bond_energy(self,formula,ordered_formula=False,silent=True): #M-X bond energy per mol of compund
+	def MX_bond_energy(self,formula,data_type='exp',ordered_formula=False,silent=True):
 		"""
 		Get metal-anion bond energy per mole of metal for binary ionic compound
 		
@@ -198,7 +221,9 @@ class MatProjCalc:
 		formula = comp.reduced_formula
 		try:
 			#look up compound if already calculated
-			abe = self.calc_MX_bond_energy[formula]
+			abe,msg = self.calc_MX_bond_energy[(formula,data_type)]
+			if silent==False:
+				print(msg)
 		except KeyError:
 			if len(comp.elements) != 2:
 				raise Exception("Formula is not a binary compound")
@@ -219,11 +244,14 @@ class MatProjCalc:
 			m = comp.get_el_amt_dict()[metal]
 			n = comp.get_el_amt_dict()[anion]
 				
-			fH = self.get_fH(formula,silent=silent) #oxide formation enthalpy
-			H_sub = self.get_fH(metal, phase='gas',silent=silent) #metal sublimation enthalpy
+			fH = self.get_fH(formula,data_type=data_type,silent=silent) #oxide formation enthalpy
+			H_sub = self.get_fH(metal, phase='gas',silent=silent) #metal sublimation enthalpy - must be exp data (no vasp data for gas)
+			#look up info messages from get_fH to store in dict
+			msg = self.fH_dict[formula,'solid',data_type][1] + '\n'
+			msg += self.fH_dict[metal,'gas','exp'][1]
 			DX2 = self.dissocation_energy[anion] #anion dissociation energy
 			abe = (fH - m*H_sub - (n/2)*DX2)/m #M-O bond energy per mole of M
-			self.calc_MX_bond_energy[formula] = abe
+			self.calc_MX_bond_energy[(formula,data_type)] = (abe,msg)
 		return abe
 		
 	#perovskite_fH is obsolete - only keeping for validation
