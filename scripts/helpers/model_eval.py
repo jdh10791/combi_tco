@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 from stats_misc import r_squared
 
+from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold, LeaveOneGroupOut
 
@@ -52,7 +53,7 @@ class repeating_KFold():
 			for train,test in self.kf.split(X,y,groups):
 				yield train,test
 	
-def KFold_cv(estimator,X,y,k=5):
+def KFold_cv(estimator,X,y,sample_weight=None,k=5,pipeline_learner_step=1):
 	"""
 	Perform k-fold cross-validation
 	Returns: actual and predicted (for test set), train scores, test scores
@@ -61,7 +62,9 @@ def KFold_cv(estimator,X,y,k=5):
 		estimator: sklearn estimator instance
 		X: data matrix (nxm)
 		y: response (n-vector)
+		sample_weight: weights for fitting data. If None, defaults to equal weights
 		k: number of folds. Default 5
+		pipeline_learner_step: if estimator is a Pipeline instance, index of the learner step
 	"""
 	kf = KFold(k,shuffle=True)
 	train_scores = np.empty(k)
@@ -71,22 +74,38 @@ def KFold_cv(estimator,X,y,k=5):
 	for i, (train_index,test_index) in enumerate(kf.split(X)):
 		X_train, X_test = X[train_index], X[test_index]
 		y_train, y_test = y[train_index], y[test_index]
+		if sample_weight is not None:
+			w_train = sample_weight[train_index]
+			w_test = sample_weight[test_index]
 		
-		estimator.fit(X_train,y_train)
-		train_scores[i] = estimator.score(X_train,y_train)
-		test_scores[i] = estimator.score(X_test,y_test)
+		if sample_weight is not None:
+			if type(estimator)==Pipeline:
+				#if estimator is a Pipeline, need to specify name of learning step in fit_params for sample_weight
+				est_name = estimator.steps[pipeline_learner_step][0]
+				estimator.fit(X_train,y_train,**{f'{est_name}__sample_weight':w_train})
+				train_scores[i] = estimator.score(X_train,y_train,**{f'{est_name}__sample_weight':w_train})
+				test_scores[i] = estimator.score(X_test,y_test,**{f'{est_name}__sample_weight':w_test})
+			else:
+				estimator.fit(X_train,y_train,sample_weight=w_train)
+				train_scores[i] = estimator.score(X_train,y_train,sample_weight=w_train)
+				test_scores[i] = estimator.score(X_test,y_test,sample_weight=w_test)
+		else:
+			# not all estimators' fit() methods accept sample_weight arg - can't just pass None
+			estimator.fit(X_train,y_train)
+			train_scores[i] = estimator.score(X_train,y_train)
+			test_scores[i] = estimator.score(X_test,y_test)
 		actual[test_index] = y_test
 		pred[test_index] = estimator.predict(X_test)
 	
 	return actual, pred, train_scores, test_scores
 	
-def repeated_KFold_cv(estimator,X,y,repeat,k=5):
+def repeated_KFold_cv(estimator,X,y,repeat,sample_weight=None,k=5,pipeline_learner_step=1):
 	actuals = np.empty((repeat,len(y)))
 	preds = np.empty_like(actuals)
 	tot_test_scores = np.empty(repeat)
 	for n in range(repeat):
-		act,pred,train,test = KFold_cv(estimator,X,y,k)
-		tot_test_score = r_squared(act,pred)
+		act,pred,train,test = KFold_cv(estimator,X,y,sample_weight,k)
+		tot_test_score = r_squared(act,pred,w=sample_weight)
 		actuals[n] = act
 		preds[n] = pred
 		tot_test_scores[n] = tot_test_score
@@ -131,7 +150,7 @@ def KFold_pva(estimator,X,y,k=5,ax=None,logscale=False,s=10):
 	
 	return train_scores, test_scores, tot_test_score
 	
-def repeated_KFold_pva(estimator,X,y,repeat,plot_type='series',k=5,ax=None,logscale=False,s=10):
+def repeated_KFold_pva(estimator,X,y,repeat,plot_type='series',sample_weight=None,k=5,pipeline_learner_step=1,ax=None,logscale=False,s=10):
 	"""
 	Perform k-fold cross-validation and plot predicted vs. actual for test set
 	
@@ -139,7 +158,9 @@ def repeated_KFold_pva(estimator,X,y,repeat,plot_type='series',k=5,ax=None,logsc
 		estimator: sklearn estimator instance
 		X: data matrix (nxm)
 		y: response (n-vector)
+		sample_weight: weights for fitting data. If None, defaults to equal weights
 		k: number of folds. Default 5
+		pipeline_learner_step: if estimator is a Pipeline instance, index of the learner step
 		ax: axis on which to plot
 		logscale: if True, plot as log-log 
 		s: marker size
@@ -149,7 +170,7 @@ def repeated_KFold_pva(estimator,X,y,repeat,plot_type='series',k=5,ax=None,logsc
 		test_scores: k-array of test scores
 		tot_test_score: overall test score (r2) considering all test folds together 
 	"""
-	actuals, preds, tot_test_scores = repeated_KFold_cv(estimator,X,y,repeat,k=k)
+	actuals, preds, tot_test_scores = repeated_KFold_cv(estimator,X,y,repeat,sample_weight,k,pipeline_learner_step)
 	if ax is None:
 		fig, ax = plt.subplots()
 	axmin = multi_min([np.min(actuals),np.min(preds)])
