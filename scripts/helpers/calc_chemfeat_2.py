@@ -315,7 +315,7 @@ class Perovskite:
 	def __init__(self, 
 				 formula,
 				 cation_site={'Ba':'A','Co':'B','Fe':'B','Zr':'B','Y':'B'},
-				 site_ox_lim={'A':[2,2],'B':[2,4],'X':[-2,-2]},
+				 site_ox_lim={'A':[0,10],'B':[0,10],'X':[-10,0]},
 				 site_base_ox={'A':2,'B':4,'X':-2},
 				 radius_type='ionic_radius',
 				 normalize_formula=True,
@@ -383,7 +383,6 @@ class Perovskite:
 		if self.radius_type not in ('crystal_radius','ionic_radius'):
 			raise Exception(f'Invalid radius type {self.radius_type}. Options are crystal_radius and ionic_radius')
 	
-	
 	@classmethod
 	def from_preset(cls,formula,preset_name,radius_type='crystal_radius',normalize_formula=False,silent=True):
 		if preset_name=='BCFZY':
@@ -395,7 +394,55 @@ class Perovskite:
 			raise ValueError("Invalid preset_name specified!")
 		
 		return cls(formula,cation_site,site_ox_lim,site_base_ox,radius_type,normalize_formula,silent)
-	
+		
+		
+	@classmethod
+	def from_ordered_formula(cls,formula,A_site_occupancy=1,anions=None,**kw):
+		"""
+		Instantiate from ordered formula. Automatically determine cation site assignments 
+		Ordered formula should list A-site cations first, B-site cations second, and anions last
+		
+		Args:
+			formula: chemical_formula
+			A_site_occupancy: number of atoms on A site
+			anions: list of anions in formula. If None, defaults to common anions
+			kw: kwargs to pass to Perovskite (site_ox_llim,site_base_ox, radius_type, silent)
+		"""
+		
+		comp = mg.Composition(formula)
+		if anions is None:
+			anions = mpcalc.common_anions
+		
+		A_amt = 0
+		cation_site = {}
+		for el,amt in comp.get_el_amt_dict().items():
+			if el not in anions:
+				if round(A_amt,5) < A_site_occupancy:
+					cation_site[el] = 'A'
+					A_amt += amt
+					if round(A_amt,5) > A_site_occupancy:
+						raise ValueError(f'Cations cannot be assigned without splitting {el} between sites')
+				elif round(A_amt,5) == A_site_occupancy:
+					cation_site[el] = 'B'
+				elif round(A_amt,5) > A_site_occupancy:
+					# this should be caught above, but just in case I missed something
+					raise ValueError('Too many atoms on A site')
+		
+		# if site_ox_lim is None:
+			# for site in 'AB':
+				# elements = [v for k,v in cation_site.items() if v==site]
+				# ox_states = sum([list(mg.Element(el).common_oxidation_states) for el in elements],[])
+				# ox_states = [ox for ox in ox_states if ox > 0]
+				# site_ox_lim[site] = [min(ox_states),max(ox_states)]
+				
+		# if site_base_ox is None:
+			# this is used only to determine aliovalent_ions, which is used only to calculate alio_net_mag
+			
+				
+		
+		return cls(formula,cation_site,normalize_formula=False,**kw)
+		
+		
 	@property
 	def site_CN(self):
 		'''
@@ -609,6 +656,9 @@ class Perovskite:
 		Get experimental M-X bond energies for binary MmXn compounds for each metal on the specified site.
 		Any binary compound found in MatProj that falls within the oxidation state limits will be considered.
 		*Note: not currently set up to handle multivalent anions, or anion doping. This should be rare...
+			This would break (adding as I notice): 
+				anion_delta calculation
+				more...
 		
 		Parameters:
 		-----------
@@ -842,7 +892,6 @@ class Perovskite:
 		X_mean = self.site_mean_mg_prop(site,'X')
 		features['X_mean'] = X_mean
 		features['X_std'] = self.site_mean_func(site,lambda el: (el.X - X_mean)**2)**0.5
-		"""need to reconsider definition below - really care about multivalent ions"""
 		features['TM_frac'] = self.site_mean_func(site,lambda el: el.is_transition_metal)
 		features['multivalent_frac'] = self.site_mean_func(site,lambda el: np.sign(len(self.allowed_ox_states[el.name])-1))
 		features['net_alio_mag'] = self.site_mean_func(site,lambda el: self.aliovalent_ions.get(el.name,0))
