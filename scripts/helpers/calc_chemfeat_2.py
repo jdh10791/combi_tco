@@ -28,6 +28,7 @@ helper_dir = os.path.join(os.environ['HOME'],"OneDrive - Colorado School of Mine
 elec_conductivity_df = pd.read_csv(os.path.join(helper_dir,'ElementalElectricalConductivity.txt'),sep='\t',skipfooter=1,engine='python')
 elec_conductivity = dict(zip(elec_conductivity_df['Symbol'],elec_conductivity_df['Electrical Conductivity (S/cm)']))
 
+
 class MatProjCalc:
 	def __init__(self,oxide_dict={}):
 		#dict to specify which oxide to use for metal
@@ -36,7 +37,7 @@ class MatProjCalc:
 		self.calc_MX_bond_energy = {} 
 		#dict to store formation enthalpies after looking up
 		self.fH_dict = {
-				('Ce','gas'):417.1 #correction to MP entry: fH for Ce gas is negative in MP
+				('Ce','gas','exp'):(417.1,'Formation enthalpy for Ce in gas phase includes exp data from phases: gas') #correction to MP entry: fH for Ce gas is negative in MP
 					}
 		self.mp = MPRester(os.environ['MATPROJ_API_KEY'])
 		print("Created MatProjCalc instance")
@@ -52,7 +53,7 @@ class MatProjCalc:
 		Bond dissociation energies for gases at 298K in kJ/mol
 		Source: https://labs.chem.ucsb.edu/zakarian/armen/11---bonddissociationenergy.pdf
 		"""
-		return dict(N=945.33,P=490,O=498.34,S=429,F=156.9,Cl=242.58,Br=193.87,I=152.549)
+		return dict(N=945.33,P=490,O=498.34,S=429,F=156.9,Cl=242.58,Br=193.87,I=152.549,H=436.002)
 		
 	@property
 	def mn_combos(self):
@@ -98,6 +99,7 @@ class MatProjCalc:
 		try:
 			fH,msg = self.fH_dict[(formula,phase,data_type)]
 			if silent==False:
+				#print('already calculated')
 				print(msg)
 		#if no entry exists, look up in MP
 		except KeyError:
@@ -173,6 +175,43 @@ class MatProjCalc:
 		else:
 			return formula, m, n
 			
+	def ox_states_from_binary_formula(self,formula,anion=None,anion_ox_state=None):
+		"""
+		Determine oxidation states from binary formula.
+		Could also use mg.Composition.oxi_state_guesses(), but the logic used is more complex.
+
+		Args:
+			formula: chemical formula
+			anion: Element symbol of anion. If None, search for common anion
+			anion_ox_state: oxidation state of anion. If None, assume common oxidation state
+		"""
+		comp = mg.Composition(formula)
+		if len(comp.elements) != 2:
+			raise ValueError('Formula must be binary')
+		# determine anion
+		if anion is None:
+			anion = np.intersect1d([e.name for e in comp.elements],self.common_anions)
+			if len(anion) > 1:
+				raise ValueError('Found multiple possible anions in formula. Please specify anion')
+			elif len(anion)==0:
+				raise ValueError('No common anions found in formula. Please specify anion')
+			else:
+				anion = anion[0]
+		metal = np.setdiff1d(comp.elements,mg.Element(anion))[0].name
+			
+		#get common oxidation state for anion
+		if anion_ox_state is None:
+			anion_ox_state = [ox for ox in mg.Element(anion).common_oxidation_states if ox < 0]
+			if len(anion_ox_state) > 1:
+				raise Exception(f"Multiple common oxidation states for {anion}. Please specify anion_ox_state")
+			else:
+				anion_ox_state = anion_ox_state[0]
+				
+		metal_ox_state = -comp.get(anion)*anion_ox_state/comp.get(metal)
+		
+		return {metal:metal_ox_state,anion:anion_ox_state}
+		
+			
 	#get_metal_oxide is obsolete - only keeping for validation (used in perovskite_fH)
 	def get_metal_oxide(self,metal,return_mn=False):
 		"""
@@ -223,6 +262,7 @@ class MatProjCalc:
 			#look up compound if already calculated
 			abe,msg = self.calc_MX_bond_energy[(formula,data_type)]
 			if silent==False:
+				#print('already calculated')
 				print(msg)
 		except KeyError:
 			if len(comp.elements) != 2:
@@ -321,7 +361,7 @@ class Perovskite:
 				 normalize_formula=True,
 				 silent=True):
 		if normalize_formula==True:
-			#normalize higher occupancy cation site to 1
+			# normalize higher occupancy cation site to 1
 			comp = mg.Composition(formula)
 			cation_amt_dict = {k:v for k,v in comp.get_el_amt_dict().items() if k in cation_site.keys()}
 			A_sum = sum(amt for el,amt in cation_amt_dict.items() if cation_site[el]=='A')
@@ -352,6 +392,10 @@ class Perovskite:
 		X_composition = mg.Composition.from_dict({k:v for k,v in self.el_amt_dict.items() if k not in cation_site.keys()})
 		self.site_composition = {'A':A_composition,'B':B_composition,'X':X_composition,'comp':self.composition}
 
+		# set nominal site amounts
+		AB_max = max([self.site_sum('A'),self.site_sum('B')])
+		self.nominal_site_amt = {'A':AB_max,'B':AB_max,'X':AB_max*3}
+		
 		#create A_site and B_site lists for convenience
 		# self.A_site = [c for c in self.cations if self.cation_site[c]=='A']
 		# self.B_site = [c for c in self.cations if self.cation_site[c]=='B']
@@ -658,7 +702,8 @@ class Perovskite:
 		*Note: not currently set up to handle multivalent anions, or anion doping. This should be rare...
 			This would break (adding as I notice): 
 				anion_delta calculation
-				more...
+				H_formation calculation - requires actual anion amount
+				more...?
 		
 		Parameters:
 		-----------
@@ -679,10 +724,12 @@ class Perovskite:
 			metal_ABEs = {}
 			for metal in [el.name for el in self.site_composition[site].elements]:
 				binaries = mpcalc.possible_ionic_formulas(metal,anion,metal_ox_lim=[min(self.allowed_ox_states[metal]),max(self.allowed_ox_states[metal])])
-				energies = []
+				energies = {}
 				for binary in binaries:
 					try:
-						energies.append(mpcalc.MX_bond_energy(binary,silent=self.silent))
+						e = mpcalc.MX_bond_energy(binary,silent=self.silent)
+						ox = mpcalc.ox_states_from_binary_formula(binary,anion=anion)[metal]
+						energies[ox] = e
 					except LookupError:
 						#no thermo data for binary compound
 						pass
@@ -701,20 +748,22 @@ class Perovskite:
 		-----------
 		site: 'A' or 'B' ('X' invalid since X-X bonds are not relevant)
 		
-		Returns: list of site-averaged MX_ABE values. Each value represents one possible combination of oxidation states
+		Generates dict of site-averaged oxidation state:MX_ABE values. Each value represents one possible combination of oxidation states
 		"""
 		#get all MX_ABEs within oxidation state limits for each metal
 		metal_ABEs = self.site_element_MX_ABE(site)
-		ABEs = list(metal_ABEs.values())
+		ABEs = [list(d.values()) for d in metal_ABEs.values()] # list(metal_ABEs.values())
+		OSs = [list(d.keys()) for d in metal_ABEs.values()] # oxidation states
 		
 		#for each combination of oxidation states, get site-averaged ABE
 		composition = self.site_composition[site]
 		weights = list(composition.get_el_amt_dict().values())
-		mean_ABEs = []
-		for tup in itertools.product(*ABEs):
-			mean_ABEs.append(np.average(tup,weights=weights))
+		mean_ABEs = {}
+		for etup,oxtup in zip(itertools.product(*ABEs),itertools.product(*OSs)):
+			mean_ABEs[(np.average(oxtup,weights=weights))] = (np.average(etup,weights=weights))
 			
 		self.site_MX_ABE[site] = mean_ABEs
+		
 		
 	def get_exp_thermo_features(self,sites,ox_stats):
 		"""
@@ -738,29 +787,35 @@ class Perovskite:
 		#get composition-averaged MX_ABE and total ABE for each possible combination
 		a = self.site_sum('A')
 		b = self.site_sum('B')
-		compavg_ABEs = np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
-		tot_ABEs = np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
-		for i, (ABE_a,ABE_b) in enumerate(itertools.product(*[self.site_MX_ABE['A'],self.site_MX_ABE['B']])):
+		compavg_ABEs = {} # {tot_cat_charge:avg_ABE} # np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
+		tot_ABEs = {} #{tot_cat_charge:tot_ABE} # np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
+		for i, ((ABE_a,ABE_b),(OS_a,OS_b)) in enumerate(zip(itertools.product(*[self.site_MX_ABE['A'].values(),self.site_MX_ABE['B'].values()]), 
+												itertools.product(*[self.site_MX_ABE['A'].keys(),self.site_MX_ABE['B'].keys()]))):
 			#composition-averaged ABE - Sammells 1992
-			compavg_ABEs[i] = 2*np.average([ABE_a/12, ABE_b/6],weights=[a,b])
+			compavg_ABEs[a*OS_a + b*OS_b] = 2*np.average([ABE_a/12, ABE_b/6],weights=[a,b])
 			#total ABE (for estimating perovskite formation enthalpy)
-			tot_ABEs[i] = a*ABE_a + b*ABE_b
+			tot_ABEs[a*OS_a + b*OS_b] = a*ABE_a + b*ABE_b
 		
-		self.site_MX_ABE['comp'] = list(compavg_ABEs)
+		self.site_MX_ABE['comp'] = compavg_ABEs #list(compavg_ABEs)
 		
 		#get total metal sublimation enthalpy
 		H_sub = 0
 		for el in self.cations:
 			H_sub += self.composition.get(el)*mpcalc.get_fH(el,'gas')
 			
-		#get total anion dissociation enthalpy
-		"""thought: should anion_delta be considered in this calculation?"""
-		DX2 = 0
-		for el,amt in self.site_composition['X'].get_el_amt_dict().items():
-			DX2 += amt*mpcalc.dissocation_energy[el]/2
+		# estimate perovskite formation enthalpy for each oxidation state combo
+		H_formation = []
+		for tot_cat_charge, tot_ABE in tot_ABEs.items():		
+			#get total anion dissociation enthalpy
+			"""anion_delta is considered in this calculation - assumes that anion vacancy amounts are proportional to nominal anion amounts"""
+			tot_anion_amt = -(tot_cat_charge/self.site_base_ox['X'])
+			print(tot_anion_amt)
+			DX2 = 0
+			for el,amt in self.site_composition['X'].get_el_amt_dict().items():
+				DX2 += tot_anion_amt*(amt/self.site_sum('X'))*mpcalc.dissocation_energy[el]/2
 		
-		#estimate perovskite formation enthalpy for each oxidation state combo
-		H_formation = tot_ABEs + H_sub + DX2
+			H_f = tot_ABE + H_sub + DX2
+			H_formation.append(H_f)
 		
 		#aggregate list of values for each specified site into features using ox_stats
 		#always get the composition-averaged MX_ABE and estimated perovskite formation enthalpy 
@@ -782,7 +837,7 @@ class Perovskite:
 		
 		#aggregate MX_ABEs
 		for i, site in enumerate(feature_sites):
-			ABEs = self.site_MX_ABE[site]
+			ABEs = list(self.site_MX_ABE[site].values())
 			for j,stat in enumerate(ox_stats):
 				if stat=='range':
 					stat_feat = (max(ABEs) - min(ABEs))
@@ -805,7 +860,7 @@ class Perovskite:
 		ox_stats: list of aggregate functions to apply to oxidation state combinations for feature generation. 
 			Options: 'min','max','mean','median','std','range', or any built-in numpy aggregate function
 		
-		Returns: list of features labels
+		Returns: list of feature labels
 		"""
 		if type(sites)==str:
 			#if sites given as string (e.g. 'ABX'), split into list for np.intersect1d
@@ -830,34 +885,86 @@ class Perovskite:
 				labels[(i+1)*len(ox_stats) + j] = f'{site_label}_ox{stat}_MX_ABE'
 		return labels
 		
-	#oxcombo_formation_enthalpies not actually used in featurize()... the logic is integrated into get_exp_thermo_features. Still keeping it for convenience and validation
-	def oxcombo_formation_enthalpies(self):
+	def exp_thermo_feature_categories(self,sites,ox_stats):
 		"""
-		Get estimated perovskite formation enthalpy for each possible oxidation state combination
-		Estimate uses concept of average M-O bond energy from Sammells et al. (1992), Solid State Ionics 52, 111-123.
+		Get categories for features based on experimental thermo data
+		
+		Parameters:
+		-----------
+		sites: list or string of sites to featurize. Any combination of 'A', 'B', 'X', and/or 'comp' accepted. 
+			'X' may be passed but will be ignored, as M-X bond energy does not apply to the X site.
+		ox_stats: list of aggregate functions to apply to oxidation state combinations for feature generation. 
+			Options: 'min','max','mean','median','std','range', or any built-in numpy aggregate function
+		
+		Returns: list of feature units
 		"""
-		#get total metal sublimation enthalpy
-		H_sub = 0
-		for el in self.cations:
-			H_sub += self.composition.get(el)*mpcalc.get_fH(el,'gas')
+		labels = self.exp_thermo_feature_labels(sites,ox_stats)
+		return ['bonding']*len(labels)
+		
+	def exp_thermo_feature_units(self,sites,ox_stats):
+		"""
+		Get units for features based on experimental thermo data
+		
+		Parameters:
+		-----------
+		sites: list or string of sites to featurize. Any combination of 'A', 'B', 'X', and/or 'comp' accepted. 
+			'X' may be passed but will be ignored, as M-X bond energy does not apply to the X site.
+		ox_stats: list of aggregate functions to apply to oxidation state combinations for feature generation. 
+			Options: 'min','max','mean','median','std','range', or any built-in numpy aggregate function
+		
+		Returns: list of feature units
+		"""
+		if type(sites)==str:
+			#if sites given as string (e.g. 'ABX'), split into list for np.intersect1d
+			sites = list(sites)
+		feature_sites = ['comp'] + list(np.intersect1d(sites,['A','B']))
+		
+		#MX_ABE for each site, and perovskite formation enthalpy for full comp only
+		units = np.empty((len(feature_sites)+1)*len(ox_stats),dtype='<U50')
+		
+		#formation enthalpy features
+		for i,stat in enumerate(ox_stats):
+			units[i] = 'energy'
+		
+		#MX_ABE features
+		for i, site in enumerate(feature_sites):
+			if site=='comp':
+				site_label = 'comp'
+			else:
+				site_label = f'{site}site'
+				
+			for j,stat in enumerate(ox_stats):
+				units[(i+1)*len(ox_stats) + j] = 'energy'
+		return units
+		
+	# oxcombo_formation_enthalpies not actually used in featurize()... the logic is integrated into get_exp_thermo_features. Still keeping it for convenience and validation
+	# def oxcombo_formation_enthalpies(self):
+		# """
+		# Get estimated perovskite formation enthalpy for each possible oxidation state combination
+		# Estimate uses concept of average M-O bond energy from Sammells et al. (1992), Solid State Ionics 52, 111-123.
+		# """
+		# #get total metal sublimation enthalpy
+		# H_sub = 0
+		# for el in self.cations:
+			# H_sub += self.composition.get(el)*mpcalc.get_fH(el,'gas')
 			
-		#get total anion dissociation enthalpy
-		"""thought: should anion_delta be considered in this calculation?"""
-		DX2 = 0
-		for el,amt in self.site_composition['X'].get_el_amt_dict().items():
-			DX2 += amt*mpcalc.dissocation_energy[el]/2
+		# #get total anion dissociation enthalpy
+		# """thought: should anion_delta be considered in this calculation?"""
+		# DX2 = 0
+		# for el,amt in self.site_composition['X'].get_el_amt_dict().items():
+			# DX2 += amt*mpcalc.dissocation_energy[el]/2
 			
-		#get sum of ABEs for each oxidation state combo
-		a = self.site_sum('A')
-		b = self.site_sum('B')
+		# #get sum of ABEs for each oxidation state combo
+		# a = self.site_sum('A')
+		# b = self.site_sum('B')
 		
-		MX_ABEs = np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
-		for i, (ABE_a, ABE_b) in enumerate(itertools.product(*[self.site_MX_ABE['A'],self.site_MX_ABE['B']])):
-			MX_ABEs[i] = a*ABE_a + b*ABE_b
+		# MX_ABEs = np.empty(len(self.site_MX_ABE['A'])*len(self.site_MX_ABE['B']))
+		# for i, (ABE_a, ABE_b) in enumerate(itertools.product(*[self.site_MX_ABE['A'],self.site_MX_ABE['B']])):
+			# MX_ABEs[i] = a*ABE_a + b*ABE_b
 		
-		H_formation = MX_ABEs + H_sub + DX2
+		# H_formation = MX_ABEs + H_sub + DX2
 		
-		return H_formation
+		# return H_formation
 		
 				
 	def site_feature_labels(self,site):
@@ -872,6 +979,32 @@ class Perovskite:
 		if site in 'AB':
 			features += ['MX_IC_mean','sigma_elec_mean']
 		return features
+		
+	def site_feature_categories(self,site):
+		"""
+		List of categories for site-level oxidation-state-independent features
+		
+		Parameters:
+		-----------
+		site: 'A', 'B', 'X', or 'comp' (for full composition)
+		"""
+		categories = ['composition','bonding','bonding','composition','composition','composition','composition','composition','elemental','elemental']
+		if site in 'AB':
+			categories += ['bonding','elemental']
+		return categories
+		
+	def site_feature_units(self,site):
+		"""
+		List of units for site-level oxidation-state-independent features
+		
+		Parameters:
+		-----------
+		site: 'A', 'B', 'X', or 'comp' (for full composition)
+		"""
+		units = ['none','none','none','none','none','none','none','none','mass','mass']
+		if site in 'AB':
+			units += ['none','S/cm']
+		return units
 		
 	def set_site_features(self,site):
 		"""
@@ -986,6 +1119,20 @@ class Perovskite:
 		if site in ['A','B','comp']:
 			features += ['X_cat_mean','X_cat_std','ion_energy_mean','ion_energy_std']
 		return features
+		
+	def site_ox_feature_categories(self,site):
+		"""Categories for oxidation state-dependent site features"""
+		categories = ['structure','structure','charge','charge','charge']
+		if site in ['A','B','comp']:
+			categories += ['bonding','bonding','charge','charge']
+		return categories
+	
+	def site_ox_feature_units(self,site):
+		"""Units for oxidation state-dependent site features"""
+		units = ['length','length','charge','charge','charge']
+		if site in ['A','B','comp']:
+			units += ['charge/length2','charge/length2','energy','energy']
+		return units
 	
 	def set_site_ox_features(self,site):
 		"""
@@ -1077,6 +1224,20 @@ class Perovskite:
 		List of composition-level oxidation state-dependent properties
 		"""
 		return ['goldschmidt','goldschmidt_struct','tau','tot_cat_charge','anion_delta','alat_hardsphere','uc_vol','uc_vol_free','r_crit']
+		
+	@property
+	def comp_ox_feature_categories(self):
+		"""
+		List of composition-level oxidation state-dependent categories
+		"""
+		return ['structure','structure','structure','charge','charge','structure','structure','structure','structure']
+		
+	@property
+	def comp_ox_feature_units(self):
+		"""
+		List of composition-level oxidation state-dependent units
+		"""
+		return ['none','none','none','charge','none','length','volume','volume','length']
 	
 	def set_comp_ox_features(self):
 		"""
@@ -1144,7 +1305,7 @@ class Perovskite:
 			
 			#total cation charge & anion delta
 			tot_cat_charge = na*self.site_sum('A') + nb*self.site_sum('B')
-			anion_delta = 3 + (tot_cat_charge/self.site_base_ox['X']) #anion non-stoichiometry
+			anion_delta = self.nominal_site_amt['X'] + (tot_cat_charge/self.site_base_ox['X']) #anion non-stoichiometry
 			
 			#unit cell volume and free volume (assume cubic)
 			if goldschmidt > 1: #A-O bonds are close packed
@@ -1171,7 +1332,7 @@ class Perovskite:
 	def get_comp_ox_features(self):
 		return self._comp_ox_features
 	
-	comp_ox_features = property(get_comp_ox_features,get_comp_ox_features,doc="DataFrame of composition-level oxidation state-dependent properties")
+	comp_ox_features = property(get_comp_ox_features,set_comp_ox_features,doc="DataFrame of composition-level oxidation state-dependent properties")
 	
 	def featurize(self,sites='ABX',ox_stats=['min','max','mean','median','std','range']):
 		"""
@@ -1286,6 +1447,72 @@ class Perovskite:
 		feature_labels += ['AB_ratio']
 			
 		return feature_labels
+		
+	def feature_categories(self,sites='ABX',ox_stats=['min','max','mean','median','std','range']):
+		"""
+		Get list of feature categories
+		
+		Parameters:
+		-----------
+		sites: sites to featurize. Any combination of A, B, and/or X accepted. Passing '' or [] will return only composition-level features
+		ox_stats: list of aggregate functions to apply to oxidation state combinations for feature generation. Options: 'min','max','mean','median','std','range'
+		
+		Returns: list of feature labels (strings)
+		"""
+		feature_categories = []
+		#composition-level oxidation-state-aggregate features
+		for stat in ox_stats:
+			feature_categories += self.comp_ox_feature_categories
+		
+		#site-level oxidation-state-aggregate features
+		for site in sites:
+			for stat in ox_stats:
+				feature_categories += self.site_ox_feature_categories(site)
+			
+		#MX_ABE features
+		feature_categories += list(self.exp_thermo_feature_categories(sites,ox_stats))
+		
+		#site-level oxidation-state-independent features
+		for site in sites:
+			feature_categories += self.site_feature_categories(site)
+		
+		#A:B ratio	 
+		feature_categories += ['composition']
+			
+		return feature_categories	
+		
+	def feature_units(self,sites='ABX',ox_stats=['min','max','mean','median','std','range']):
+		"""
+		Get list of feature units
+		
+		Parameters:
+		-----------
+		sites: sites to featurize. Any combination of A, B, and/or X accepted. Passing '' or [] will return only composition-level features
+		ox_stats: list of aggregate functions to apply to oxidation state combinations for feature generation. Options: 'min','max','mean','median','std','range'
+		
+		Returns: list of feature labels (strings)
+		"""
+		feature_units = []
+		#composition-level oxidation-state-aggregate features
+		for stat in ox_stats:
+			feature_units += self.comp_ox_feature_units
+		
+		#site-level oxidation-state-aggregate features
+		for site in sites:
+			for stat in ox_stats:
+				feature_units += self.site_ox_feature_units(site)
+			
+		#MX_ABE features
+		feature_units += list(self.exp_thermo_feature_units(sites,ox_stats))
+		
+		#site-level oxidation-state-independent features
+		for site in sites:
+			feature_units += self.site_feature_units(site)
+		
+		#A:B ratio	 
+		feature_units += ['none']
+			
+		return feature_units
 	
 def formula_redfeat(formula,cat_ox_lims={}):
 	pvskt = perovskite(formula,site_ox_lim={'A':[2,4],'B':[2,4]},site_base_ox={'A':2,'B':4})
